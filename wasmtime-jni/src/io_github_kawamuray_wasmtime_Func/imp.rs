@@ -7,7 +7,7 @@ use anyhow::bail;
 use jni::objects::{JClass, JObject};
 use jni::sys::{jint, jlong, jobjectArray};
 use jni::{JNIEnv, JavaVM};
-use wasmtime::{Caller, Func, FuncType, Store, Trap, Val};
+use wasmtime::{Caller, Func, FuncType, Store, Trap, Val, ValType};
 
 pub(super) struct JniFuncImpl;
 
@@ -23,25 +23,7 @@ impl<'a> JniFunc<'a> for JniFuncImpl {
     ) -> Result<jlong, Self::Error> {
         let mut store = interop::ref_from_raw::<Store<StoreData>>(store_ptr)?;
 
-        let param_types_objs = env
-            .get_field(
-                &fn_type,
-                "params",
-                "[Lio/github/kawamuray/wasmtime/Val$Type;",
-            )?
-            .l()?
-            .into_raw();
-        let param_types = wval::types_from_java(env, param_types_objs)?.into_boxed_slice();
-        let result_type_objs = env
-            .get_field(
-                &fn_type,
-                "results",
-                "[Lio/github/kawamuray/wasmtime/Val$Type;",
-            )?
-            .l()?
-            .into_raw();
-        let result_types = wval::types_from_java(env, result_type_objs)?.into_boxed_slice();
-        let fn_type = FuncType::new(param_types.to_vec(), result_types.to_vec());
+        let fn_type = func_type_from_java(env, &fn_type, &store)?;
 
         let jvm = env.get_java_vm()?;
         let finalizer = FuncFinalizer {
@@ -75,13 +57,29 @@ impl<'a> JniFunc<'a> for JniFuncImpl {
             let wasm_val = wval::from_java(env, val?)?;
             wasm_params.push(wasm_val);
         }
-        let mut wasm_results =
-            vec![unsafe { std::mem::zeroed() }; func.ty(&mut *store).results().len()];
+        let mut wasm_results: Vec<Val> = func
+            .ty(&mut *store)
+            .results()
+            .map(|ty| match ty {
+                ValType::I32 => Val::I32(0),
+                ValType::I64 => Val::I64(0),
+                ValType::F32 => Val::F32(0),
+                ValType::F64 => Val::F64(0),
+                ValType::V128 => Val::V128(0_u128.into()),
+                ValType::Ref(r) => {
+                    if r.heap_type().is_func() {
+                        Val::FuncRef(None)
+                    } else {
+                        Val::AnyRef(None)
+                    }
+                }
+            })
+            .collect();
 
         if let Err(e) = func.call(&mut *store, &wasm_params, &mut wasm_results) {
             return Err(if let Some(trap) = e.downcast_ref::<Trap>() {
                 errors::Error::WasmTrap(*trap)
-            } else if let Some(exit) = e.downcast_ref::<wasi_common::I32Exit>() {
+            } else if let Some(exit) = e.downcast_ref::<wasmtime_wasi::I32Exit>() {
                 errors::Error::WasiI32ExitCode(exit.0)
             } else {
                 e.into()
@@ -90,7 +88,7 @@ impl<'a> JniFunc<'a> for JniFuncImpl {
 
         let java_results = wasm_results
             .into_iter()
-            .map(|wasm_val| wval::into_java(env, wasm_val.clone()))
+            .map(|wasm_val: Val| wval::into_java(env, wasm_val.clone()))
             .collect::<Result<Vec<_>, _>>()?;
 
         utils::into_java_array(env, "io/github/kawamuray/wasmtime/Val", java_results)
@@ -102,6 +100,36 @@ impl<'a> JniFunc<'a> for JniFuncImpl {
     }
 }
 
+fn func_type_from_java(
+    env: &mut JNIEnv,
+    fn_type: &JObject,
+    store: &Store<StoreData>,
+) -> Result<FuncType> {
+    let param_types_objs = env
+        .get_field(
+            fn_type,
+            "params",
+            "[Lio/github/kawamuray/wasmtime/Val$Type;",
+        )?
+        .l()?
+        .into_raw();
+    let param_types = wval::types_from_java(env, param_types_objs)?.into_boxed_slice();
+    let result_type_objs = env
+        .get_field(
+            fn_type,
+            "results",
+            "[Lio/github/kawamuray/wasmtime/Val$Type;",
+        )?
+        .l()?
+        .into_raw();
+    let result_types = wval::types_from_java(env, result_type_objs)?.into_boxed_slice();
+    Ok(FuncType::new(
+        store.engine(),
+        param_types.to_vec(),
+        result_types.to_vec(),
+    ))
+}
+
 struct FuncFinalizer {
     jvm: JavaVM,
     index: jint,
@@ -109,14 +137,14 @@ struct FuncFinalizer {
 
 impl Drop for FuncFinalizer {
     fn drop(&mut self) {
-        let mut env = self.jvm.attach_current_thread().unwrap();
-        env.call_static_method(
-            "io/github/kawamuray/wasmtime/Func",
-            "dropTrampoline",
-            "(I)V",
-            &[self.index.into()],
-        )
-        .unwrap();
+        if let Ok(mut env) = self.jvm.attach_current_thread() {
+            let _ = env.call_static_method(
+                "io/github/kawamuray/wasmtime/Func",
+                "dropTrampoline",
+                "(I)V",
+                &[self.index.into()],
+            );
+        }
     }
 }
 

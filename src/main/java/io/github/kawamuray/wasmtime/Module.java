@@ -23,6 +23,14 @@ public class Module implements Disposable {
         return new Module(newFromBinary(engine.innerPtr(), bytes));
     }
 
+    public byte[] serialize() {
+        return nativeSerialize();
+    }
+
+    public static Module deserialize(Engine engine, byte[] bytes) {
+        return new Module(nativeDeserialize(engine.innerPtr(), bytes));
+    }
+
     public native ImportType[] imports();
 
     @Override
@@ -33,4 +41,8 @@ public class Module implements Disposable {
     private static native long newFromFile(long enginePtr, String fileName);
 
     private static native long newFromBinary(long enginePtr, byte[] bytes);
+
+    private native byte[] nativeSerialize();
+
+    private static native long nativeDeserialize(long enginePtr, byte[] bytes);
 }

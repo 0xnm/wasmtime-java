@@ -2,11 +2,12 @@ use super::JniStore;
 use crate::errors;
 use crate::interop;
 use crate::store::StoreData;
+use anyhow::anyhow;
 use jni::objects::{JClass, JObject};
 use jni::sys::*;
 use jni::{self, JNIEnv};
 use wasmtime::{Engine, Store};
-use wasmtime_wasi::WasiCtx;
+use wasmtime_wasi::p1::WasiP1Ctx;
 
 pub(super) struct JniStoreImpl;
 
@@ -29,7 +30,7 @@ impl<'a> JniStore<'a> for JniStoreImpl {
         let wasi = if wasi_ctx_ptr == 0 {
             None
         } else {
-            Some(interop::from_raw::<WasiCtx>(wasi_ctx_ptr)?)
+            Some(interop::from_raw::<WasiP1Ctx>(wasi_ctx_ptr)?)
         };
         let java_data = if data.is_null() {
             None
@@ -58,7 +59,7 @@ impl<'a> JniStore<'a> for JniStoreImpl {
 
     fn gc(env: &mut JNIEnv<'a>, this: JObject<'a>) -> Result<(), Self::Error> {
         let mut store = interop::get_inner::<Store<StoreData>>(env, &this)?;
-        store.gc();
+        store.gc(None);
         Ok(())
     }
 
@@ -67,6 +68,11 @@ impl<'a> JniStore<'a> for JniStoreImpl {
         this: JObject<'a>,
         ticks_beyond_current: jlong,
     ) -> Result<(), Self::Error> {
+        if ticks_beyond_current < 0 {
+            return Err(errors::Error::Wasmtime(anyhow!(
+                "epoch deadline must be non-negative"
+            )));
+        }
         let mut store = interop::get_inner::<Store<StoreData>>(env, &this)?;
         store.set_epoch_deadline(ticks_beyond_current as u64);
         Ok(())

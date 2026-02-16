@@ -9,7 +9,7 @@ pub fn from_java(env: &mut JNIEnv, throwable: JThrowable) -> Result<anyhow::Erro
             "io/github/kawamuray/wasmtime/WasmFunctionError$I32ExitError",
         )? {
             let exit_code = env.call_method(&throwable, "exitCode", "()I", &[])?.i()?;
-            anyhow!(wasi_common::I32Exit(exit_code))
+            anyhow!(wasmtime_wasi::I32Exit(exit_code))
         } else if env.is_instance_of(
             &throwable,
             "io/github/kawamuray/wasmtime/WasmFunctionError$TrapError",

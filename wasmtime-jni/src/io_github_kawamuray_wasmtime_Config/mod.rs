@@ -24,11 +24,7 @@ macro_rules! wrap_error {
 
 trait JniConfig<'a> {
     type Error: Desc<'a, JThrowable<'a>>;
-    fn cache_config_load_default(
-        env: &mut JNIEnv<'a>,
-        this: JObject<'a>,
-    ) -> Result<jobject, Self::Error>;
-    fn cache_config_load_native(
+    fn cache(
         env: &mut JNIEnv<'a>,
         this: JObject<'a>,
         path: JString<'a>,
@@ -54,11 +50,6 @@ trait JniConfig<'a> {
         enable: jboolean,
     ) -> Result<jobject, Self::Error>;
     fn dispose(env: &mut JNIEnv<'a>, this: JObject<'a>) -> Result<(), Self::Error>;
-    fn dynamic_memory_guard_size(
-        env: &mut JNIEnv<'a>,
-        this: JObject<'a>,
-        guard_size: jlong,
-    ) -> Result<jobject, Self::Error>;
     fn epoch_interruption(
         env: &mut JNIEnv<'a>,
         this: JObject<'a>,
@@ -69,21 +60,21 @@ trait JniConfig<'a> {
         this: JObject<'a>,
         size: jlong,
     ) -> Result<jobject, Self::Error>;
+    fn memory_guard_size(
+        env: &mut JNIEnv<'a>,
+        this: JObject<'a>,
+        guard_size: jlong,
+    ) -> Result<jobject, Self::Error>;
+    fn memory_reservation(
+        env: &mut JNIEnv<'a>,
+        this: JObject<'a>,
+        max_size: jlong,
+    ) -> Result<jobject, Self::Error>;
     fn new_config(env: &mut JNIEnv<'a>, clazz: JClass<'a>) -> Result<jlong, Self::Error>;
     fn profiler(
         env: &mut JNIEnv<'a>,
         this: JObject<'a>,
         profile: JObject<'a>,
-    ) -> Result<jobject, Self::Error>;
-    fn static_memory_guard_size(
-        env: &mut JNIEnv<'a>,
-        this: JObject<'a>,
-        guard_size: jlong,
-    ) -> Result<jobject, Self::Error>;
-    fn static_memory_maximum_size(
-        env: &mut JNIEnv<'a>,
-        this: JObject<'a>,
-        max_size: jlong,
     ) -> Result<jobject, Self::Error>;
     fn strategy(
         env: &mut JNIEnv<'a>,
@@ -117,34 +108,20 @@ trait JniConfig<'a> {
     ) -> Result<jobject, Self::Error>;
 }
 
-#[no_mangle]
-extern "system" fn Java_io_github_kawamuray_wasmtime_Config_cacheConfigLoadDefault<'a>(
-    mut env: JNIEnv<'a>,
-    this: JObject<'a>,
-) -> jobject {
-    wrap_error!(
-        env,
-        JniConfigImpl::cache_config_load_default(&mut env, this),
-        JObject::null().into_raw()
-    )
-}
-
-#[no_mangle]
-extern "system" fn Java_io_github_kawamuray_wasmtime_Config_cacheConfigLoadNative__Ljava_lang_String_2<
-    'a,
->(
+#[unsafe(no_mangle)]
+extern "system" fn Java_io_github_kawamuray_wasmtime_Config_cache__Ljava_lang_String_2<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
     path: JString<'a>,
 ) -> jobject {
     wrap_error!(
         env,
-        JniConfigImpl::cache_config_load_native(&mut env, this, path),
+        JniConfigImpl::cache(&mut env, this, path),
         JObject::null().into_raw()
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_craneliftDebugVerifier__Z<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -157,7 +134,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_craneliftDebugVerifi
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_craneliftNanCanonicalization__Z<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -170,7 +147,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_craneliftNanCanonica
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_craneliftOptLevel__Lio_github_kawamuray_wasmtime_OptLevel_2<
     'a,
 >(
@@ -185,7 +162,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_craneliftOptLevel__L
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_debugInfo__Z<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -198,7 +175,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_debugInfo__Z<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_dispose<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -210,20 +187,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_dispose<'a>(
     )
 }
 
-#[no_mangle]
-extern "system" fn Java_io_github_kawamuray_wasmtime_Config_dynamicMemoryGuardSize__J<'a>(
-    mut env: JNIEnv<'a>,
-    this: JObject<'a>,
-    guard_size: jlong,
-) -> jobject {
-    wrap_error!(
-        env,
-        JniConfigImpl::dynamic_memory_guard_size(&mut env, this, guard_size),
-        JObject::null().into_raw()
-    )
-}
-
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_epochInterruption__Z<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -236,7 +200,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_epochInterruption__Z
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_maxWasmStack__J<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -249,7 +213,33 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_maxWasmStack__J<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
+extern "system" fn Java_io_github_kawamuray_wasmtime_Config_memoryGuardSize__J<'a>(
+    mut env: JNIEnv<'a>,
+    this: JObject<'a>,
+    guard_size: jlong,
+) -> jobject {
+    wrap_error!(
+        env,
+        JniConfigImpl::memory_guard_size(&mut env, this, guard_size),
+        JObject::null().into_raw()
+    )
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_io_github_kawamuray_wasmtime_Config_memoryReservation__J<'a>(
+    mut env: JNIEnv<'a>,
+    this: JObject<'a>,
+    max_size: jlong,
+) -> jobject {
+    wrap_error!(
+        env,
+        JniConfigImpl::memory_reservation(&mut env, this, max_size),
+        JObject::null().into_raw()
+    )
+}
+
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_newConfig<'a>(
     mut env: JNIEnv<'a>,
     clazz: JClass<'a>,
@@ -261,7 +251,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_newConfig<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_profiler__Lio_github_kawamuray_wasmtime_ProfilingStrategy_2<
     'a,
 >(
@@ -276,33 +266,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_profiler__Lio_github
     )
 }
 
-#[no_mangle]
-extern "system" fn Java_io_github_kawamuray_wasmtime_Config_staticMemoryGuardSize__J<'a>(
-    mut env: JNIEnv<'a>,
-    this: JObject<'a>,
-    guard_size: jlong,
-) -> jobject {
-    wrap_error!(
-        env,
-        JniConfigImpl::static_memory_guard_size(&mut env, this, guard_size),
-        JObject::null().into_raw()
-    )
-}
-
-#[no_mangle]
-extern "system" fn Java_io_github_kawamuray_wasmtime_Config_staticMemoryMaximumSize__J<'a>(
-    mut env: JNIEnv<'a>,
-    this: JObject<'a>,
-    max_size: jlong,
-) -> jobject {
-    wrap_error!(
-        env,
-        JniConfigImpl::static_memory_maximum_size(&mut env, this, max_size),
-        JObject::null().into_raw()
-    )
-}
-
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_strategy__Lio_github_kawamuray_wasmtime_Strategy_2<
     'a,
 >(
@@ -317,7 +281,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_strategy__Lio_github
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_wasmBulkMemory__Z<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -330,7 +294,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_wasmBulkMemory__Z<'a
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_wasmMultiValue__Z<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -343,7 +307,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_wasmMultiValue__Z<'a
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_wasmReferenceTypes__Z<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -356,7 +320,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_wasmReferenceTypes__
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_wasmSimd__Z<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -369,7 +333,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Config_wasmSimd__Z<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Config_wasmThreads__Z<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,

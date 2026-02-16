@@ -13,6 +13,7 @@ public class ImportType {
         GLOBAL,
         TABLE,
         MEMORY,
+        TAG,
     }
 
     @Getter
@@ -52,5 +53,10 @@ public class ImportType {
     public TableType table() {
         ensureType(ImportType.Type.TABLE);
         return (TableType) typeObj;
+    }
+
+    public TagType tag() {
+        ensureType(ImportType.Type.TAG);
+        return (TagType) typeObj;
     }
 }

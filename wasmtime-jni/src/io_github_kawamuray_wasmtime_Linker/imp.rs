@@ -66,7 +66,13 @@ impl<'a> JniLinker<'a> for JniLinkerImpl {
         let module = utils::get_string(env, &module)?;
         let name = utils::get_string(env, &name)?;
         let ret = match linker.get(&mut *store, &module, &name) {
-            Some(ext) => wextern::into_java(env, ext)?.into_raw(),
+            Some(ext) => match wextern::into_java(env, ext) {
+                Ok(obj) => obj.into_raw(),
+                Err(err) => match err {
+                    errors::Error::NotImplemented => wextern::unknown(env)?.into_raw(),
+                    _ => return Err(err),
+                },
+            },
             None => JObject::null().into_raw(),
         };
         Ok(ret)

@@ -9,10 +9,14 @@ import lombok.experimental.Accessors;
 @AllArgsConstructor
 public class TableType {
     Val.Type element;
-    int minimum;
-    int maximum;
+    long minimum;
+    long maximum;
+
+    public TableType(Val.Type element, long minimum) {
+        this(element, minimum, -1L);
+    }
 
     public TableType(Val.Type element, int minimum) {
-        this(element, minimum, -1);
+        this(element, (long) minimum);
     }
 }

@@ -38,7 +38,7 @@ public class Func implements Disposable {
     /**
      * Call this function with given variadic arguments
      * @param args a collection of argument values passed to the callee function
-     * @return a list of returned values
+     * @return an array of returned values
      * @throws WasmFunctionError if the function throws an exception or exits with WASI API
      * @throws WasmtimeException if the wasmtime runtime throws an internal exception
      */

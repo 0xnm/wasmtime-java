@@ -11,6 +11,13 @@ use std::sync::Mutex;
 
 pub const INNER_PTR_FIELD: &str = "innerPtr";
 
+fn lock_poisoned() -> jni::errors::Error {
+    jni::errors::Error::MethodNotFound {
+        name: "mutex lock poisoned".into(),
+        sig: "".into(),
+    }
+}
+
 pub struct ReentrantLock<T> {
     mutex: Mutex<T>,
     current_owner: AtomicU64,
@@ -85,10 +92,16 @@ where
 /// Restore a Rust object of type `T` from a pointer.
 /// This is the reverse operation of `into_raw`.
 pub fn from_raw<T>(ptr: jlong) -> Result<T> {
-    Ok((*unsafe { Box::from_raw(ptr as *mut Mutex<T>) }).into_inner()?)
+    if ptr == 0 {
+        return Err(jni::errors::Error::NullPtr("from_raw: null pointer").into());
+    }
+    Ok((*unsafe { Box::from_raw(ptr as *mut ReentrantLock<T>) }).mutex.into_inner()?)
 }
 
 pub fn ref_from_raw<'a, T>(ptr: jlong) -> Result<ReentrantReference<'a, T>> {
+    if ptr == 0 {
+        return Err(jni::errors::Error::NullPtr("ref_from_raw: null pointer").into());
+    }
     let ptr = ptr as *mut ReentrantLock<T>;
     unsafe { (*ptr).lock() }
 }
@@ -155,7 +168,7 @@ where
     non_null!(ptr, "rust value from Java");
     unsafe {
         // dereferencing is safe, because we checked it for null
-        Ok((*ptr).lock().unwrap())
+        (*ptr).lock().map_err(|_| lock_poisoned())
     }
 }
 
@@ -201,8 +214,7 @@ where
 
         mbox
     };
-
-    Ok(mbox.mutex.into_inner().unwrap())
+    mbox.mutex.into_inner().map_err(|_| lock_poisoned())
 }
 
 pub fn set_inner<'a, O, S, T>(
@@ -237,6 +249,7 @@ pub fn dispose_inner<'a, T>(env: &mut JNIEnv<'a>, obj: &JObject<'a>) -> JniResul
 where
     T: 'static,
 {
+
     if inner_ptr(env, obj)? == 0 {
         return Ok(());
     }

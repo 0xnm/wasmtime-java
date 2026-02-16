@@ -1,10 +1,11 @@
 use crate::errors::{Error, Result};
 use crate::utils;
 use crate::utils::into_java_array;
-use jni::objects::JObject;
+use anyhow::anyhow;
+use jni::objects::{JByteArray, JObject};
 use jni::sys::jobjectArray;
 use jni::JNIEnv;
-use wasmtime::{Val, ValType};
+use wasmtime::{RefType, Val, ValType};
 
 pub const VAL_TYPE: &str = "io/github/kawamuray/wasmtime/Val$Type";
 
@@ -29,6 +30,42 @@ pub fn from_java<'a>(env: &mut JNIEnv<'a>, obj: JObject<'a>) -> Result<Val> {
         "F64" => {
             let val = env.call_method(obj, "f64", "()D", &[])?.d()?;
             Val::from(val)
+        }
+        "V128" => {
+            let bytes = env
+                .call_method(obj, "v128", "()[B", &[])?
+                .l()?
+                .into_raw();
+            let bytes = env.convert_byte_array(unsafe { JByteArray::from_raw(bytes as _) })?;
+            if bytes.len() != 16 {
+                return Err(Error::Wasmtime(anyhow!(
+                    "v128 value must contain exactly 16 bytes"
+                )));
+            }
+            let mut raw = [0u8; 16];
+            raw.copy_from_slice(&bytes);
+            Val::V128(u128::from_le_bytes(raw).into())
+        }
+        "NULL_FUNC_REF" => Val::FuncRef(None),
+        "FUNC_REF" => {
+            let func_obj = env
+                .call_method(obj, "funcRef", "()Lio/github/kawamuray/wasmtime/Func;", &[])?
+                .l()?;
+            if func_obj.is_null() {
+                Val::FuncRef(None)
+            } else {
+                return Err(Error::NotImplemented);
+            }
+        }
+        "EXTERN_REF" => {
+            let extern_ref = env
+                .call_method(obj, "externRef", "()Ljava/lang/Object;", &[])?
+                .l()?;
+            if extern_ref.is_null() {
+                Val::AnyRef(None)
+            } else {
+                return Err(Error::NotImplemented);
+            }
         }
         _ => return Err(Error::UnknownEnum(name)),
     })
@@ -68,6 +105,34 @@ pub fn into_java<'a>(env: &mut JNIEnv<'a>, val: Val) -> Result<JObject<'a>> {
                 &[f64::from_bits(v).into()],
             )?
             .l()?,
+        Val::V128(v) => {
+            let bytes = env.byte_array_from_slice(&v.as_u128().to_le_bytes())?;
+            env.call_static_method(
+                "io/github/kawamuray/wasmtime/Val",
+                "fromV128",
+                "([B)Lio/github/kawamuray/wasmtime/Val;",
+                &[(&bytes).into()],
+            )?
+            .l()?
+        }
+        Val::FuncRef(None) => env
+            .call_static_method(
+                "io/github/kawamuray/wasmtime/Val",
+                "nullFuncRef",
+                "()Lio/github/kawamuray/wasmtime/Val;",
+                &[],
+            )?
+            .l()?,
+        Val::FuncRef(Some(_)) => return Err(Error::NotImplemented),
+        Val::AnyRef(None) => env
+            .call_static_method(
+                "io/github/kawamuray/wasmtime/Val",
+                "fromExternRef",
+                "(Ljava/lang/Object;)Lio/github/kawamuray/wasmtime/Val;",
+                &[(&JObject::null()).into()],
+            )?
+            .l()?,
+        Val::AnyRef(Some(_)) => return Err(Error::NotImplemented),
         _ => return Err(Error::NotImplemented),
     })
 }
@@ -79,6 +144,10 @@ pub fn type_from_java(env: &mut JNIEnv, obj: JObject) -> Result<ValType> {
         "I64" => ValType::I64,
         "F32" => ValType::F32,
         "F64" => ValType::F64,
+        "V128" => ValType::V128,
+        "EXTERN_REF" => ValType::Ref(RefType::EXTERNREF),
+        "FUNC_REF" => ValType::Ref(RefType::FUNCREF),
+        "NULL_FUNC_REF" => ValType::Ref(RefType::NULLFUNCREF),
         _ => return Err(Error::UnknownEnum(name)),
     })
 }
@@ -95,23 +164,34 @@ pub fn types_into_java_array(
 ) -> Result<jobjectArray> {
     let mut vec = Vec::with_capacity(it.len());
     for result in it {
-        let x = self::type_into_java(env, result)?;
+        let x = self::val_type_into_java(env, result)?;
         vec.push(x)
     }
     into_java_array(env, VAL_TYPE, vec)
 }
 
-pub fn type_into_java<'a>(env: &mut JNIEnv<'a>, val: ValType) -> Result<JObject<'a>> {
+pub fn val_type_into_java<'a>(env: &mut JNIEnv<'a>, val: ValType) -> Result<JObject<'a>> {
     match val {
         ValType::I32 => type_from_enum(env, "I32"),
         ValType::I64 => type_from_enum(env, "I64"),
         ValType::F32 => type_from_enum(env, "F32"),
         ValType::F64 => type_from_enum(env, "F64"),
         ValType::V128 => type_from_enum(env, "V128"),
-        ValType::ExternRef => type_from_enum(env, "EXTERN_REF"),
-        ValType::FuncRef => type_from_enum(env, "FUNC_REF"),
+        ValType::Ref(ref_type) => ref_type_into_java(env, ref_type)
     }
 }
+
+pub fn ref_type_into_java<'a>(env: &mut JNIEnv<'a>, ref_type: RefType) -> Result<JObject<'a>> {
+            if ref_type.matches(&RefType::EXTERNREF) {
+                type_from_enum(env, "EXTERN_REF")
+            } else if ref_type.matches(&RefType::FUNCREF) {
+                type_from_enum(env, "FUNC_REF")
+            } else if ref_type.matches(&RefType::NULLFUNCREF) {
+                type_from_enum(env, "NULL_FUNC_REF")
+            } else {
+                Err(Error::UnknownEnum(format!("Cannot match ref type {}", &ref_type)))
+            }
+        }
 
 pub fn types_from_java<'a>(env: &mut JNIEnv<'a>, array: jobjectArray) -> Result<Vec<ValType>> {
     let mut iter = utils::JavaArrayIter::new(env, array)?;

@@ -35,5 +35,5 @@ public enum Trap {
     ///
     /// For more information see
     /// [`Config::consume_fuel`](crate::Config::consume_fuel).
-    OUF_OF_FUEL,
+    OUT_OF_FUEL,
 }

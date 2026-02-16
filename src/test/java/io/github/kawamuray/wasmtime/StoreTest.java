@@ -1,6 +1,7 @@
 package io.github.kawamuray.wasmtime;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -19,11 +20,25 @@ public class StoreTest {
         }
     }
 
+    @Test
+    public void testGc() {
+        try (Store<Void> store = Store.withoutData()) {
+            store.gc();
+        }
+    }
+
     @Test(expected = NullPointerException.class)
     public void testUseAfterFree() {
         Store<Void> store = Store.withoutData();
         store.close();
         store.engine(); // UAF
+    }
+
+    @Test(expected = NullPointerException.class)
+    public void testGcUseAfterFree() {
+        Store<Void> store = Store.withoutData();
+        store.close();
+        store.gc(); // UAF
     }
 
 

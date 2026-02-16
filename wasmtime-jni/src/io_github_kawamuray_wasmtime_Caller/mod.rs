@@ -32,7 +32,7 @@ trait JniCaller<'a> {
     ) -> Result<jobject, Self::Error>;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Caller_data<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -44,7 +44,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Caller_data<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Caller_nativeGetExport__Ljava_lang_String_2<
     'a,
 >(

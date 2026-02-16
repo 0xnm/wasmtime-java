@@ -42,7 +42,7 @@ trait JniStore<'a> {
     fn stored_data(env: &mut JNIEnv<'a>, this: JObject<'a>) -> Result<jobject, Self::Error>;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Store_dispose<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -54,7 +54,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Store_dispose<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Store_enginePtr<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -66,7 +66,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Store_enginePtr<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Store_gc<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -74,7 +74,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Store_gc<'a>(
     wrap_error!(env, JniStoreImpl::gc(&mut env, this), Default::default())
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Store_newStore__JLjava_lang_Object_2J<'a>(
     mut env: JNIEnv<'a>,
     clazz: JClass<'a>,
@@ -89,7 +89,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Store_newStore__JLjava_lang
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Store_setEpochDeadline__J<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -102,7 +102,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Store_setEpochDeadline__J<'
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Store_storedData<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,

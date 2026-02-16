@@ -2,17 +2,15 @@
 name = "wasmtime-jni"
 version = "0.1.0"
 authors = ["Yuto Kawamura <kawamuray.dadada@gmail.com>"]
-edition = "2018"
+edition = "2024"
 
 [lib]
-crate_type = ["cdylib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 jni = "0.21.1"
 thiserror = "1.0.40"
 anyhow = "1.0.70"
-wasmtime = "7.0.0"
-wasmtime-wasi = "7.0.0"
-wasi-common = "7.0.0"
-wasi-cap-std-sync = "7.0.0"
-cap-std = "1.0.7"
+wasmtime = "41.0.3"
+wasmtime-wasi = "41.0.3"
+tokio = { version = "1", features = ["io-util"] }

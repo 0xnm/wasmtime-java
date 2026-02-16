@@ -26,6 +26,14 @@ trait JniModule<'a> {
     type Error: Desc<'a, JThrowable<'a>>;
     fn dispose(env: &mut JNIEnv<'a>, this: JObject<'a>) -> Result<(), Self::Error>;
     fn imports(env: &mut JNIEnv<'a>, this: JObject<'a>) -> Result<jobjectArray, Self::Error>;
+    fn native_deserialize(
+        env: &mut JNIEnv<'a>,
+        clazz: JClass<'a>,
+        engine_ptr: jlong,
+        bytes: jbyteArray,
+    ) -> Result<jlong, Self::Error>;
+    fn native_serialize(env: &mut JNIEnv<'a>, this: JObject<'a>)
+        -> Result<jbyteArray, Self::Error>;
     fn new_from_binary(
         env: &mut JNIEnv<'a>,
         clazz: JClass<'a>,
@@ -46,7 +54,7 @@ trait JniModule<'a> {
     ) -> Result<jlong, Self::Error>;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Module_dispose<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -58,7 +66,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Module_dispose<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Module_imports<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -70,7 +78,33 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Module_imports<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
+extern "system" fn Java_io_github_kawamuray_wasmtime_Module_nativeDeserialize__J_3B<'a>(
+    mut env: JNIEnv<'a>,
+    clazz: JClass<'a>,
+    engine_ptr: jlong,
+    bytes: jbyteArray,
+) -> jlong {
+    wrap_error!(
+        env,
+        JniModuleImpl::native_deserialize(&mut env, clazz, engine_ptr, bytes),
+        Default::default()
+    )
+}
+
+#[unsafe(no_mangle)]
+extern "system" fn Java_io_github_kawamuray_wasmtime_Module_nativeSerialize<'a>(
+    mut env: JNIEnv<'a>,
+    this: JObject<'a>,
+) -> jbyteArray {
+    wrap_error!(
+        env,
+        JniModuleImpl::native_serialize(&mut env, this),
+        JObject::null().into_raw()
+    )
+}
+
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Module_newFromBinary__J_3B<'a>(
     mut env: JNIEnv<'a>,
     clazz: JClass<'a>,
@@ -84,7 +118,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Module_newFromBinary__J_3B<
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Module_newFromFile__JLjava_lang_String_2<
     'a,
 >(
@@ -100,7 +134,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Module_newFromFile__JLjava_
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Module_newModule__J_3B<'a>(
     mut env: JNIEnv<'a>,
     clazz: JClass<'a>,

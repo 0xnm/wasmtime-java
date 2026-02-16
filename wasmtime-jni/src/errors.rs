@@ -5,7 +5,6 @@ use jni::objects::JThrowable;
 use jni::{self, JNIEnv};
 use std::io;
 use thiserror::Error;
-use wasi_common::StringArrayError;
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
@@ -15,6 +14,8 @@ pub enum Error {
     Jni(#[from] jni::errors::Error),
     #[error("Wasmtime error: {0}")]
     Wasmtime(#[from] anyhow::Error),
+    #[error("memory access error: {0}")]
+    MemoryAccess(#[from] wasmtime::MemoryAccessError),
     #[error("aborted instruction execution: {0}")]
     WasmTrap(#[from] wasmtime::Trap),
     #[error("wasi exit code: {0}")]
@@ -25,12 +26,8 @@ pub enum Error {
     NotImplemented,
     #[error("{0}")]
     LockPoison(String),
-    #[error("{0}")]
-    WasiConfig(#[from] StringArrayError),
     #[error("IO error: {0}")]
     Io(#[from] io::Error),
-    #[error("WASI error: {0}")]
-    Wasi(#[from] wasi_common::Error),
 }
 
 impl<G> From<std::sync::PoisonError<G>> for Error {
@@ -62,6 +59,10 @@ unsafe impl<'a> Desc<'a, JThrowable<'a>> for Error {
                 "io/github/kawamuray/wasmtime/WasmtimeException",
                 e.to_string(),
             ),
+            MemoryAccess(e) => (
+                "io/github/kawamuray/wasmtime/MemoryAccessException",
+                e.to_string(),
+            ),
             WasmTrap(trap) => {
                 let jtrap = wtrap::into_java(env, trap)?;
                 let jtrap_ex = env.new_object(
@@ -80,17 +81,9 @@ unsafe impl<'a> Desc<'a, JThrowable<'a>> for Error {
                     )?
                     .into())
             }
-            WasiConfig(e) => (
-                "io/github/kawamuray/wasmtime/WasmtimeException",
-                e.to_string(),
-            ),
             Io(_) | UnknownEnum(_) | NotImplemented | LockPoison(_) => {
                 ("java/lang/RuntimeException", self.to_string())
             }
-            Wasi(e) => (
-                "io/github/kawamuray/wasmtime/WasmtimeException",
-                e.to_string(),
-            ),
         };
 
         let jmsg = env.new_string(msg)?;

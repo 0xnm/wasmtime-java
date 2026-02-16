@@ -22,7 +22,13 @@ impl<'a> JniCaller<'a> for JniCallerImpl {
         let mut caller = interop::get_inner::<Caller<StoreData>>(env, &this)?;
         Ok(match caller.get_export(&utils::get_string(env, &name)?) {
             None => JObject::null().into_raw(),
-            Some(ext) => wextern::into_java(env, ext)?.into_raw(),
+            Some(ext) => match wextern::into_java(env, ext) {
+                Ok(obj) => obj.into_raw(),
+                Err(err) => match err {
+                    errors::Error::NotImplemented => wextern::unknown(env)?.into_raw(),
+                    _ => return Err(err),
+                },
+            },
         })
     }
 

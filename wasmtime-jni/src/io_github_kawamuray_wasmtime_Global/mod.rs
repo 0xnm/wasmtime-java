@@ -43,7 +43,7 @@ trait JniGlobal<'a> {
     ) -> Result<(), Self::Error>;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Global_dispose<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -55,7 +55,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Global_dispose<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Global_nativeGet__J<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -68,7 +68,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Global_nativeGet__J<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Global_nativeMutable__J<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -81,7 +81,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Global_nativeMutable__J<'a>
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Global_nativeSet__JLio_github_kawamuray_wasmtime_Val_2<
     'a,
 >(

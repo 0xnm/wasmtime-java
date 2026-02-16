@@ -2,36 +2,30 @@ use crate::errors;
 use crate::interop;
 use crate::io_github_kawamuray_wasmtime_Config::JniConfig;
 use crate::utils;
+use anyhow::anyhow;
 use jni::objects::{JClass, JObject, JString};
 use jni::sys::{jboolean, jlong, jobject};
 use jni::{self, JNIEnv};
-use std::path::Path;
 use std::result::Result;
-use wasmtime::{Config, OptLevel, ProfilingStrategy, Strategy};
+use wasmtime::{Cache, Config, OptLevel, ProfilingStrategy, Strategy};
 
 pub(super) struct JniConfigImpl;
 
 impl<'a> JniConfig<'a> for JniConfigImpl {
     type Error = errors::Error;
-    fn cache_config_load_default(
-        env: &mut JNIEnv<'a>,
-        this: JObject<'a>,
-    ) -> Result<jobject, Self::Error> {
-        let mut config = interop::get_inner::<Config>(env, &this)?;
-        config.cache_config_load_default()?;
-        Ok(this.into_raw())
-    }
-    fn cache_config_load_native(
+    fn cache(
         env: &mut JNIEnv<'a>,
         this: JObject<'a>,
         path: JString<'a>,
     ) -> Result<jobject, Self::Error> {
         let mut config = interop::get_inner::<Config>(env, &this)?;
-        let path_j_str = env.get_string(&path)?;
-        //the trait `From<Utf8Error>` is not implemented for `errors::Error`
-        //So the `?` operator cannot be used at here
-        let path_str = path_j_str.to_str().expect("error path!");
-        config.cache_config_load(Path::new(path_str))?;
+        if path.is_null() {
+            config.cache(None);
+        } else {
+            let path = utils::get_string(env, &path)?;
+            let cache = Cache::from_file(Some(path.as_ref()))?;
+            config.cache(Some(cache));
+        }
         Ok(this.into_raw())
     }
     fn cranelift_debug_verifier(
@@ -77,15 +71,6 @@ impl<'a> JniConfig<'a> for JniConfigImpl {
         config.debug_info(enable == 1);
         Ok(this.into_raw())
     }
-    fn dynamic_memory_guard_size(
-        env: &mut JNIEnv<'a>,
-        this: JObject<'a>,
-        guard_size: jlong,
-    ) -> Result<jobject, Self::Error> {
-        let mut config = interop::get_inner::<Config>(env, &this)?;
-        config.dynamic_memory_guard_size(guard_size as u64);
-        Ok(this.into_raw())
-    }
     fn epoch_interruption(
         env: &mut JNIEnv<'a>,
         this: JObject<'a>,
@@ -100,6 +85,11 @@ impl<'a> JniConfig<'a> for JniConfigImpl {
         this: JObject<'a>,
         size: jlong,
     ) -> Result<jobject, Self::Error> {
+        if size < 0 {
+            return Err(errors::Error::Wasmtime(anyhow!(
+                "max wasm stack size must be non-negative"
+            )));
+        }
         let mut config = interop::get_inner::<Config>(env, &this)?;
         config.max_wasm_stack(size as usize);
         Ok(this.into_raw())
@@ -124,22 +114,32 @@ impl<'a> JniConfig<'a> for JniConfigImpl {
         config.profiler(profiling_strategy);
         Ok(this.into_raw())
     }
-    fn static_memory_guard_size(
+    fn memory_guard_size(
         env: &mut JNIEnv<'a>,
         this: JObject<'a>,
         guard_size: jlong,
     ) -> Result<jobject, Self::Error> {
+        if guard_size < 0 {
+            return Err(errors::Error::Wasmtime(anyhow!(
+                "memory guard size must be non-negative"
+            )));
+        }
         let mut config = interop::get_inner::<Config>(env, &this)?;
-        config.static_memory_guard_size(guard_size as u64);
+        config.memory_guard_size(guard_size as u64);
         Ok(this.into_raw())
     }
-    fn static_memory_maximum_size(
+    fn memory_reservation(
         env: &mut JNIEnv<'a>,
         this: JObject<'a>,
         max_size: jlong,
     ) -> Result<jobject, Self::Error> {
+        if max_size < 0 {
+            return Err(errors::Error::Wasmtime(anyhow!(
+                "memory reservation must be non-negative"
+            )));
+        }
         let mut config = interop::get_inner::<Config>(env, &this)?;
-        config.static_memory_maximum_size(max_size as u64);
+        config.memory_reservation(max_size as u64);
         Ok(this.into_raw())
     }
     fn strategy(

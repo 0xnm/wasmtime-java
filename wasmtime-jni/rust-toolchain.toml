@@ -1,0 +1,4 @@
+[toolchain]
+# The 'wasmtime-jni' crate requires an unstable feature (thread_id_value),
+# which necessitates building with the 'nightly' Rust toolchain.
+channel = "nightly"

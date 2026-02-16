@@ -22,11 +22,11 @@ public class Memory implements Disposable {
         return nativeDataSize(store.innerPtr());
     }
 
-    public <T> int size(Store<T> store) {
+    public <T> long size(Store<T> store) {
         return nativeSize(store.innerPtr());
     }
 
-    public <T> int grow(Store<T> store, long deltaPages) {
+    public <T> long grow(Store<T> store, long deltaPages) {
         return nativeGrow(store.innerPtr(), deltaPages);
     }
 
@@ -39,7 +39,7 @@ public class Memory implements Disposable {
 
     private native long nativeDataSize(long storePtr);
 
-    private native int nativeSize(long storePtr);
+    private native long nativeSize(long storePtr);
 
-    private native int nativeGrow(long storePtr, long deltaPages);
+    private native long nativeGrow(long storePtr, long deltaPages);
 }

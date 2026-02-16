@@ -4,6 +4,7 @@ import lombok.Data;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.function.Consumer;
 
 public class ModuleTest {
@@ -23,15 +24,17 @@ public class ModuleTest {
                                                      "  (global $m1 (import \"globals\" \"mutable\") (mut i32))\n" +
                                                      "  (global $c2 (import \"globalz\" \"const\") i64)\n" +
                                                      "  (func $hello (import \"first\" \"package\"))\n" +
-                                                     "  (import \"tbl\" \"small\" (table 0 4 anyfunc))\n" +
-                                                     "  (import \"tbl\" \"big\" (table 12 1995 anyfunc))\n" +
-                                                     "  (import \"lua\" \"integration\" (table 1 anyfunc))\n" +
+                                                     "  (import \"tbl\" \"small\" (table 0 4 funcref))\n" +
+                                                     "  (import \"tbl\" \"big\" (table 12 1995 funcref))\n" +
+                                                     "  (import \"lua\" \"integration\" (table 1 funcref))\n" +
                                                      "  (import \"env\" \"memory\" (memory $mem 1))\n" +
                                                      "  (import \"\" \"package\" (func $world (param $p1 i32)))\n" +
                                                      "  (import \"xyz\" \"return\" (func (result i32)))\n" +
                                                      "  (import \"xyz\" \"return\" (func (param i32 i32 i32 i32 i32)))\n" +
                                                      "  (func (export \"run\") (call $hello))\n" +
                                                      ")").getBytes();
+
+    private static final byte[] INVALID_SERIALIZED_MODULE_BYTES = new byte[] {0x01, 0x23, 0x45, 0x67};
 
     @Test
     public void testCreateDispose() {
@@ -72,6 +75,36 @@ public class ModuleTest {
                 TestImportData.func("xyz", "return", new Val.Type[]{}, new Val.Type[]{Val.Type.I32}),
                 TestImportData.func("xyz", "return", new Val.Type[]{Val.Type.I32, Val.Type.I32, Val.Type.I32, Val.Type.I32, Val.Type.I32}, new Val.Type[]{})
             });
+        }
+    }
+
+    @Test
+    public void testSerializeDeserializeRoundtrip() {
+        try (
+            Store<Void> store = Store.withoutData();
+            Engine engine = store.engine();
+            Module module = new Module(engine, WAT_BINARY)
+        ) {
+            byte[] serialized = module.serialize();
+            try (
+                Module deserialized = Module.deserialize(engine, serialized);
+                Instance instance = new Instance(store, deserialized, Collections.emptyList());
+                Func add = instance.getFunc(store, "add").get()
+            ) {
+                Val[] results = add.call(store, Val.fromI32(7), Val.fromI32(8));
+                Assert.assertEquals(1, results.length);
+                Assert.assertEquals(15, results[0].i32());
+            }
+        }
+    }
+
+    @Test
+    public void testDeserializeInvalidBytesFails() {
+        try (Engine engine = new Engine()) {
+            Assert.assertThrows(
+                WasmtimeException.class,
+                () -> Module.deserialize(engine, INVALID_SERIALIZED_MODULE_BYTES)
+            );
         }
     }
 
@@ -155,7 +188,7 @@ public class ModuleTest {
             );
         }
 
-        public static TestImportData<TableType> table(String module, String name, Val.Type content, int min, int max) {
+        public static TestImportData<TableType> table(String module, String name, Val.Type content, long min, long max) {
             return new TestImportData<>(
                 module, name, ImportType.Type.TABLE, TableType.class,
                 mod -> {

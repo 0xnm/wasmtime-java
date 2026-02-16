@@ -11,6 +11,7 @@ public class Val {
         F64,
         EXTERN_REF,
         FUNC_REF,
+        NULL_FUNC_REF,
         V128,
     }
 
@@ -38,6 +39,35 @@ public class Val {
         return new Val(Type.F64, val);
     }
 
+    /** Creates a {@code v128} value from exactly 16 bytes (little-endian). */
+    public static Val fromV128(byte[] bytes) {
+        if (bytes == null || bytes.length != 16) {
+            throw new IllegalArgumentException("v128 must be exactly 16 bytes");
+        }
+        return new Val(Type.V128, bytes.clone());
+    }
+
+    /** Creates a null funcref value. */
+    public static Val nullFuncRef() {
+        return new Val(Type.NULL_FUNC_REF, null);
+    }
+
+    /** Creates a funcref value, currently supporting only {@code null}. */
+    public static Val fromFuncRef(Func func) {
+        if (func == null) {
+            return nullFuncRef();
+        }
+        throw new UnsupportedOperationException("Non-null FUNC_REF values are not supported yet");
+    }
+
+    /** Creates an externref value, currently supporting only {@code null}. */
+    public static Val fromExternRef(Object ref) {
+        if (ref != null) {
+            throw new UnsupportedOperationException("Non-null EXTERN_REF values are not supported yet");
+        }
+        return new Val(Type.EXTERN_REF, ref);
+    }
+
     private void ensureType(Type expected) {
         if (type != expected) {
             throw new RuntimeException(
@@ -63,5 +93,26 @@ public class Val {
     public double f64() {
         ensureType(Type.F64);
         return (double) value;
+    }
+
+    /** Returns this value as a defensive copy of 16-byte {@code v128}. */
+    public byte[] v128() {
+        ensureType(Type.V128);
+        return ((byte[]) value).clone();
+    }
+
+    /** Returns this value as funcref ({@code null} for {@code NULL_FUNC_REF}). */
+    public Func funcRef() {
+        if (type == Type.NULL_FUNC_REF) {
+            return null;
+        }
+        ensureType(Type.FUNC_REF);
+        return (Func) value;
+    }
+
+    /** Returns this value as externref. */
+    public Object externRef() {
+        ensureType(Type.EXTERN_REF);
+        return value;
     }
 }

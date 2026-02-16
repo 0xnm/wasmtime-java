@@ -1,6 +1,9 @@
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
+import java.nio.file.Files
+import java.nio.file.Paths
+
 plugins {
     id 'java-library'
     id 'maven-publish'
@@ -16,13 +19,13 @@ repositories {
 }
 
 dependencies {
-    compileOnly 'org.projectlombok:lombok:1.18.12'
-    annotationProcessor 'org.projectlombok:lombok:1.18.12'
-    testCompileOnly 'org.projectlombok:lombok:1.18.12'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.12'
+    compileOnly 'org.projectlombok:lombok:1.18.20'
+    annotationProcessor 'org.projectlombok:lombok:1.18.20'
+    testCompileOnly 'org.projectlombok:lombok:1.18.20'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.20'
     implementation 'org.slf4j:slf4j-api:1.7.25'
-    testImplementation 'junit:junit:4.13'
-    testRuntimeOnly 'ch.qos.logback:logback-classic:1.2.3'
+    testImplementation 'junit:junit:4.13.1'
+    testRuntimeOnly 'ch.qos.logback:logback-classic:1.5.13'
 }
 
 java {
@@ -74,8 +77,9 @@ static def jniLibOsClassifier() {
 
 static def jniLibArchClassifier() {
     def target = rustTargetTriple() ?: ""
-    // Use the first part of the rust target triple as the arch classifier if set, otherwise assume "x86_64"
-    return target ? target.split("-")[0] : "x86_64"
+    // Use the first part of the rust target triple as the arch classifier if set, otherwise assume "aarch64" for
+    // macOS or "x86_64" for other OS
+    return target ? target.split("-")[0] : ("macos" == jniLibOsClassifier() ? "aarch64" : "x86_64" )
 }
 
 static def rustTargetTriple() {
@@ -132,6 +136,7 @@ task generateJniInterfaces(type:JavaExec) {
             'io.github.kawamuray.wasmtime.Module',
             'io.github.kawamuray.wasmtime.Store',
             'io.github.kawamuray.wasmtime.Config',
+            'io.github.kawamuray.wasmtime.Tag',
             'io.github.kawamuray.wasmtime.Caller',
             'io.github.kawamuray.wasmtime.wasi.WasiCtx',
             'io.github.kawamuray.wasmtime.wasi.WasiCtxBuilder']
@@ -159,6 +164,19 @@ task generateJniInterfaces(type:JavaExec) {
             new File(project.buildDir, path).lastModified()
         }.max()
         smallestGeneratedTimestamp >= largestSourceTimestamp
+    }
+    doLast {
+        Files.walk(Paths.get("./wasmtime-jni/src"))
+                .filter { Files::isRegularFile(it) }
+                .forEach {
+                    def processed = Files.readAllLines(it)
+                            .stream()
+                            .map {
+                                it.replace("#[no_mangle]", "#[unsafe(no_mangle)]")
+                            }
+                            .toList()
+                    Files.write(it, processed)
+                }
     }
 }
 

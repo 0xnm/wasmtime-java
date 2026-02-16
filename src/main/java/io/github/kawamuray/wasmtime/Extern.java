@@ -14,6 +14,7 @@ public class Extern {
         GLOBAL,
         TABLE,
         MEMORY,
+        TAG,
     }
 
     public static final Extern UNKNOWN = new Extern(Type.UNKNOWN, null);
@@ -36,6 +37,10 @@ public class Extern {
 
     public static Extern fromGlobal(Global table) {
         return new Extern(Type.GLOBAL, table);
+    }
+
+    public static Extern fromTag(Tag tag) {
+        return new Extern(Type.TAG, tag);
     }
 
     private void ensureType(Type expected) {
@@ -63,6 +68,11 @@ public class Extern {
     public Table table() {
         ensureType(Type.TABLE);
         return (Table) value;
+    }
+
+    public Tag tag() {
+        ensureType(Type.TAG);
+        return (Tag) value;
     }
 
 }

@@ -3,17 +3,15 @@ package io.github.kawamuray.wasmtime;
 import org.junit.Assert;
 import org.junit.Test;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 public class ConfigTest {
     @Test
     public void testNewConfig(){
         try(Config config = new Config()){
-            Assert.assertNotEquals(config.innerPtr(),0);
-        }
-    }
-    @Test
-    public void testCacheConfigLoadDefault(){
-        try(Config config = new Config()){
-            config.cacheConfigLoadDefault();
+            Assert.assertNotEquals(0, config.innerPtr());
         }
     }
     @Test
@@ -49,6 +47,43 @@ public class ConfigTest {
                  Store store = new Store(engine)) {
                  store.engine();
             }
+        }
+    }
+
+    @Test
+    public void testNegativeSizesFail() {
+        try (Config config = new Config()) {
+            RuntimeException stack = Assert.assertThrows(RuntimeException.class, () -> config.maxWasmStack(-1));
+            Assert.assertTrue(stack.getMessage().contains("non-negative"));
+
+            RuntimeException guard = Assert.assertThrows(RuntimeException.class, () -> config.memoryGuardSize(-1));
+            Assert.assertTrue(guard.getMessage().contains("non-negative"));
+
+            RuntimeException reservation = Assert.assertThrows(RuntimeException.class, () -> config.memoryReservation(-1));
+            Assert.assertTrue(reservation.getMessage().contains("non-negative"));
+        }
+    }
+
+    @Test
+    public void testCacheConfig() throws Exception {
+        Path configPath = Files.createTempFile("wasmtime-cache-config", ".toml");
+        Files.write(configPath, "[cache]\n".getBytes(StandardCharsets.UTF_8));
+        try (Config config = new Config()) {
+            config.cache(configPath.toString());
+            try (Engine engine = new Engine(config)) {
+                Assert.assertNotEquals(0, engine.innerPtr());
+            }
+        } finally {
+            Files.deleteIfExists(configPath);
+        }
+    }
+
+    @Test
+    public void testCacheInvalidPathFails() {
+        try (Config config = new Config()) {
+            RuntimeException ex = Assert.assertThrows(RuntimeException.class,
+                    () -> config.cache("/definitely/non-existent/wasmtime-cache.toml"));
+            Assert.assertNotNull(ex.getMessage());
         }
     }
 }

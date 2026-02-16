@@ -1,7 +1,7 @@
 // THIS FILE IS GENERATED AUTOMATICALLY. DO NOT EDIT!
 mod imp;
 
-use self::imp::JniWasiCtxImpl;
+use self::imp::JniTagImpl;
 use jni::descriptors::Desc;
 use jni::objects::*;
 use jni::sys::*;
@@ -22,37 +22,15 @@ macro_rules! wrap_error {
     };
 }
 
-trait JniWasiCtx<'a> {
+trait JniTag<'a> {
     type Error: Desc<'a, JThrowable<'a>>;
     fn dispose(env: &mut JNIEnv<'a>, this: JObject<'a>) -> Result<(), Self::Error>;
-    fn native_add_to_linker(
-        env: &mut JNIEnv<'a>,
-        clazz: JClass<'a>,
-        linker_ptr: jlong,
-    ) -> Result<(), Self::Error>;
 }
 
 #[unsafe(no_mangle)]
-extern "system" fn Java_io_github_kawamuray_wasmtime_wasi_WasiCtx_dispose<'a>(
+extern "system" fn Java_io_github_kawamuray_wasmtime_Tag_dispose<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
 ) {
-    wrap_error!(
-        env,
-        JniWasiCtxImpl::dispose(&mut env, this),
-        Default::default()
-    )
-}
-
-#[unsafe(no_mangle)]
-extern "system" fn Java_io_github_kawamuray_wasmtime_wasi_WasiCtx_nativeAddToLinker__J<'a>(
-    mut env: JNIEnv<'a>,
-    clazz: JClass<'a>,
-    linker_ptr: jlong,
-) {
-    wrap_error!(
-        env,
-        JniWasiCtxImpl::native_add_to_linker(&mut env, clazz, linker_ptr),
-        Default::default()
-    )
+    wrap_error!(env, JniTagImpl::dispose(&mut env, this), Default::default())
 }

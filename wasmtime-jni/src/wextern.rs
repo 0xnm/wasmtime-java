@@ -2,7 +2,7 @@ use crate::errors::{Error, Result};
 use crate::{interop, utils};
 use jni::objects::JObject;
 use jni::JNIEnv;
-use wasmtime::{Extern, Func, Global, Memory, Table};
+use wasmtime::{Extern, Func, Global, Memory, Table, Tag};
 
 pub fn from_java<'a>(env: &mut JNIEnv<'a>, obj: JObject<'a>) -> Result<Extern> {
     let ty = env
@@ -28,6 +28,27 @@ pub fn from_java<'a>(env: &mut JNIEnv<'a>, obj: JObject<'a>) -> Result<Extern> {
                 .l()?;
             let memory = interop::get_inner::<Memory>(env, &mem_obj)?;
             Extern::from(memory.clone())
+        }
+        "TABLE" => {
+            let table_obj = env
+                .call_method(obj, "table", "()Lio/github/kawamuray/wasmtime/Table;", &[])?
+                .l()?;
+            let table = interop::get_inner::<Table>(env, &table_obj)?;
+            Extern::from(table.clone())
+        }
+        "GLOBAL" => {
+            let global_obj = env
+                .call_method(obj, "global", "()Lio/github/kawamuray/wasmtime/Global;", &[])?
+                .l()?;
+            let global = interop::get_inner::<Global>(env, &global_obj)?;
+            Extern::from(global.clone())
+        }
+        "TAG" => {
+            let tag_obj = env
+                .call_method(obj, "tag", "()Lio/github/kawamuray/wasmtime/Tag;", &[])?
+                .l()?;
+            let tag = interop::get_inner::<Tag>(env, &tag_obj)?;
+            Extern::from(tag.clone())
         }
         _ => return Err(Error::UnknownEnum(name)),
     };
@@ -89,6 +110,20 @@ pub fn into_java<'a>(env: &mut JNIEnv<'a>, ext: Extern) -> Result<JObject<'a>> {
                 "fromGlobal",
                 "(Lio/github/kawamuray/wasmtime/Global;)Lio/github/kawamuray/wasmtime/Extern;",
                 &[(&global_obj).into()],
+            )?
+            .l()?
+        }
+        Extern::Tag(tag) => {
+            let tag_obj = env.new_object(
+                "io/github/kawamuray/wasmtime/Tag",
+                "(J)V",
+                &[interop::into_raw::<Tag>(tag).into()],
+            )?;
+            env.call_static_method(
+                "io/github/kawamuray/wasmtime/Extern",
+                "fromTag",
+                "(Lio/github/kawamuray/wasmtime/Tag;)Lio/github/kawamuray/wasmtime/Extern;",
+                &[(&tag_obj).into()],
             )?
             .l()?
         }

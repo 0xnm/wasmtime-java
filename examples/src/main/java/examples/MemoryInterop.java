@@ -20,7 +20,7 @@ import io.github.kawamuray.wasmtime.wasi.WasiCtxBuilder;
 
 public class MemoryInterop {
     // Build it with `cargo wasi build`
-    private static final String WASM_PATH = "./memory-interop/target/wasm32-wasi/debug/memory_interop.wasm";
+    private static final String WASM_PATH = "./memory-interop/target/wasm32-wasip1/debug/memory_interop.wasm";
 
     public static void main(String[] args) {
         String[] words = { "Hello", "from", "Java!" };

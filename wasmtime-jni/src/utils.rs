@@ -1,4 +1,5 @@
 use crate::errors::{Error, Result};
+use anyhow::anyhow;
 use jni::objects::{JObject, JObjectArray};
 use jni::sys::{jint, jobjectArray};
 use jni::JNIEnv;
@@ -12,6 +13,18 @@ pub fn get_string(env: &mut JNIEnv, obj: &JObject) -> Result<String> {
 pub fn get_string_field(env: &mut JNIEnv, obj: &JObject, field: &str) -> Result<String> {
     let s = env.get_field(obj, field, "Ljava/lang/String;")?.l()?;
     get_string(env, &s)
+}
+
+/// Shorthand of obtaining and turning `JObject` from a field into a Rust `u32`.
+pub fn get_u32_field(env: &mut JNIEnv, obj: &JObject, field: &str) -> Result<u32> {
+    let i = env.get_field(obj, field, "I")?.i()?;
+    if i < 0 {
+        return Err(Error::Wasmtime(anyhow!(
+            "field '{}' must be non-negative",
+            field
+        )));
+    }
+    Ok(i as u32)
 }
 
 /// Convert a Vec of JObjects into jobjectArray.
@@ -33,15 +46,16 @@ pub fn enum_name(env: &mut JNIEnv, obj: JObject) -> Result<String> {
 }
 
 /// Iterate over java object array.
-pub struct JavaArrayIter {
-    array: jobjectArray,
+pub struct JavaArrayIter<'a> {
+    array: JObjectArray<'a>,
     len: usize,
     cur: usize,
 }
 
-impl JavaArrayIter {
-    pub fn new(env: &mut JNIEnv, array: jobjectArray) -> Result<Self> {
-        let len = env.get_array_length(&unsafe { JObjectArray::from_raw(array) })? as usize;
+impl<'a> JavaArrayIter<'a> {
+    pub fn new(env: &mut JNIEnv<'a>, array: jobjectArray) -> Result<Self> {
+        let array = unsafe { JObjectArray::from_raw(array) };
+        let len = env.get_array_length(&array)? as usize;
         Ok(Self { array, len, cur: 0 })
     }
 
@@ -49,14 +63,11 @@ impl JavaArrayIter {
         self.len
     }
 
-    pub fn next<'a>(&mut self, env: &mut JNIEnv<'a>) -> Option<Result<JObject<'a>, Error>> {
+    pub fn next(&mut self, env: &mut JNIEnv<'a>) -> Option<Result<JObject<'a>, Error>> {
         if self.cur >= self.len {
             return None;
         }
-        let ret = env.get_object_array_element(
-            &unsafe { JObjectArray::from_raw(self.array) },
-            self.cur as jint,
-        );
+        let ret = env.get_object_array_element(&self.array, self.cur as jint);
         self.cur += 1;
         Some(ret.map_err(Into::into))
     }

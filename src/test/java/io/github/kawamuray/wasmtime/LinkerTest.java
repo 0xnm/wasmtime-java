@@ -116,6 +116,29 @@ public class LinkerTest {
     }
 
     @Test
+    public void testDefineFromExportedGlobalAndTableExtern() {
+        try (Store<Void> store = Store.withoutData();
+             Linker linker = new Linker(store.engine());
+             Engine engine = store.engine();
+             Module module = new Module(engine, WAT_BYTES_GLOBAL)) {
+            linker.module(store, "", module);
+
+            Extern globalExtern = linker.get(store, "", "global").get();
+            Extern tableExtern = linker.get(store, "", "__indirect_function_table").get();
+            assertEquals(Extern.Type.GLOBAL, globalExtern.type());
+            assertEquals(Extern.Type.TABLE, tableExtern.type());
+
+            linker.define(store, "copy", "g", globalExtern);
+            linker.define(store, "copy", "t", tableExtern);
+
+            assertTrue(linker.get(store, "copy", "g").isPresent());
+            assertEquals(Extern.Type.GLOBAL, linker.get(store, "copy", "g").get().type());
+            assertTrue(linker.get(store, "copy", "t").isPresent());
+            assertEquals(Extern.Type.TABLE, linker.get(store, "copy", "t").get().type());
+        }
+    }
+
+    @Test
     public void testExternsOfMulti() {
         try (Store<Void> store = Store.withoutData();
                 Linker linker = new Linker(store.engine());

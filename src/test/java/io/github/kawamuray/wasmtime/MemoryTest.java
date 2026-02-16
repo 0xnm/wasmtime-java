@@ -2,6 +2,7 @@ package io.github.kawamuray.wasmtime;
 
 import static io.github.kawamuray.wasmtime.WasmValType.I32;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.After;
 import org.junit.Before;
@@ -91,6 +92,33 @@ public class MemoryTest {
             mem.grow(store, 64);
             long after = mem.size(store);
             assertEquals(before + 64, after);
+        }
+    }
+
+    @Test
+    public void testBufferAfterGrowNeedsRefresh() {
+        try (Memory mem = instance.getMemory(store, "memory").get()) {
+            ByteBuffer oldBuffer = mem.buffer(store);
+            int oldCapacity = oldBuffer.capacity();
+            assertEquals(PAGE_SIZE * 2, oldCapacity);
+
+            mem.grow(store, 1);
+            assertEquals(PAGE_SIZE * 3, mem.dataSize(store));
+
+            ByteBuffer refreshed = mem.buffer(store);
+            assertEquals(PAGE_SIZE * 3, refreshed.capacity());
+            assertEquals(oldCapacity, oldBuffer.capacity());
+
+            boolean outOfRangeThrows = false;
+            try {
+                oldBuffer.get((int) (PAGE_SIZE * 2));
+            } catch (IndexOutOfBoundsException e) {
+                outOfRangeThrows = true;
+            }
+            assertTrue(outOfRangeThrows);
+
+            refreshed.put((int) (PAGE_SIZE * 2), (byte) 55);
+            assertEquals(55, refreshed.get((int) (PAGE_SIZE * 2)));
         }
     }
 }

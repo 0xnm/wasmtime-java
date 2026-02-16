@@ -40,7 +40,7 @@ trait JniFunc<'a> {
     ) -> Result<jlong, Self::Error>;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Func_dispose<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -52,7 +52,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Func_dispose<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Func_nativeCall__J_3Lio_github_kawamuray_wasmtime_Val_2<
     'a,
 >(
@@ -68,7 +68,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Func_nativeCall__J_3Lio_git
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Func_newFunc__JLio_github_kawamuray_wasmtime_FuncType_2I<
     'a,
 >(

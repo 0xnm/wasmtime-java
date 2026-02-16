@@ -59,7 +59,7 @@ trait JniLinker<'a> {
     ) -> Result<jlong, Self::Error>;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_dispose<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -71,7 +71,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_dispose<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_nativeDefine__JLjava_lang_String_2Ljava_lang_String_2Lio_github_kawamuray_wasmtime_Extern_2<
     'a,
 >(
@@ -89,7 +89,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_nativeDefine__JLjava
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_nativeExterns__J<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -102,7 +102,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_nativeExterns__J<'a>
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_nativeGet__JLjava_lang_String_2Ljava_lang_String_2<
     'a,
 >(
@@ -119,7 +119,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_nativeGet__JLjava_la
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_nativeModule__JLjava_lang_String_2J<
     'a,
 >(
@@ -136,7 +136,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_nativeModule__JLjava
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Linker_newLinker__J<'a>(
     mut env: JNIEnv<'a>,
     clazz: JClass<'a>,

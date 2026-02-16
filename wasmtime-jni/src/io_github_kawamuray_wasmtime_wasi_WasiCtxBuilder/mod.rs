@@ -29,30 +29,34 @@ trait JniWasiCtxBuilder<'a> {
         clazz: JClass<'a>,
         envs: jobjectArray,
         args: jobjectArray,
+        inherit_args: jboolean,
         inherit_stdin: jboolean,
-        stdin_path: JString<'a>,
+        stdin_stream: JObject<'a>,
         inherit_stdout: jboolean,
-        stdout_path: JString<'a>,
+        stdout_stream: JObject<'a>,
         inherit_stderr: jboolean,
-        stderr_path: JString<'a>,
+        stderr_stream: JObject<'a>,
+        allow_blocking_current_thread: jboolean,
         preopen_dirs: jobjectArray,
     ) -> Result<jlong, Self::Error>;
 }
 
-#[no_mangle]
-extern "system" fn Java_io_github_kawamuray_wasmtime_wasi_WasiCtxBuilder_nativeBuild___3Ljava_lang_Object_2_3Ljava_lang_Object_2ZLjava_lang_String_2ZLjava_lang_String_2ZLjava_lang_String_2_3Ljava_lang_Object_2<
+#[unsafe(no_mangle)]
+extern "system" fn Java_io_github_kawamuray_wasmtime_wasi_WasiCtxBuilder_nativeBuild___3Ljava_lang_Object_2_3Ljava_lang_Object_2ZZLjava_io_InputStream_2ZLjava_io_OutputStream_2ZLjava_io_OutputStream_2Z_3Ljava_lang_Object_2<
     'a,
 >(
     mut env: JNIEnv<'a>,
     clazz: JClass<'a>,
     envs: jobjectArray,
     args: jobjectArray,
+    inherit_args: jboolean,
     inherit_stdin: jboolean,
-    stdin_path: JString<'a>,
+    stdin_stream: JObject<'a>,
     inherit_stdout: jboolean,
-    stdout_path: JString<'a>,
+    stdout_stream: JObject<'a>,
     inherit_stderr: jboolean,
-    stderr_path: JString<'a>,
+    stderr_stream: JObject<'a>,
+    allow_blocking_current_thread: jboolean,
     preopen_dirs: jobjectArray,
 ) -> jlong {
     wrap_error!(
@@ -62,12 +66,14 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_wasi_WasiCtxBuilder_nativeB
             clazz,
             envs,
             args,
+            inherit_args,
             inherit_stdin,
-            stdin_path,
+            stdin_stream,
             inherit_stdout,
-            stdout_path,
+            stdout_stream,
             inherit_stderr,
-            stderr_path,
+            stderr_stream,
+            allow_blocking_current_thread,
             preopen_dirs
         ),
         Default::default()

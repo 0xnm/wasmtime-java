@@ -46,7 +46,7 @@ trait JniInstance<'a> {
     ) -> Result<jlong, Self::Error>;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Instance_dispose<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -58,7 +58,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Instance_dispose<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Instance_nativeGetFunc__JLjava_lang_String_2<
     'a,
 >(
@@ -74,7 +74,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Instance_nativeGetFunc__JLj
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Instance_nativeGetMemory__JLjava_lang_String_2<
     'a,
 >(
@@ -90,7 +90,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Instance_nativeGetMemory__J
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Instance_newInstance__JJ_3Lio_github_kawamuray_wasmtime_Extern_2<
     'a,
 >(

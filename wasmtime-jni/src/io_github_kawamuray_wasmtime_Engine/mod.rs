@@ -34,7 +34,7 @@ trait JniEngine<'a> {
     ) -> Result<jlong, Self::Error>;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Engine_dispose<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -46,7 +46,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Engine_dispose<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Engine_incrementEpoch<'a>(
     mut env: JNIEnv<'a>,
     this: JObject<'a>,
@@ -58,7 +58,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Engine_incrementEpoch<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Engine_newEngine<'a>(
     mut env: JNIEnv<'a>,
     clazz: JClass<'a>,
@@ -70,7 +70,7 @@ extern "system" fn Java_io_github_kawamuray_wasmtime_Engine_newEngine<'a>(
     )
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 extern "system" fn Java_io_github_kawamuray_wasmtime_Engine_newEngineWithConfig__Lio_github_kawamuray_wasmtime_Config_2<
     'a,
 >(

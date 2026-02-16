@@ -245,6 +245,26 @@ public class Config implements Disposable{
     /// really just to put in place the type used for profiling.
     public native Config profiler(ProfilingStrategy profile);
 
+    /// Set a custom [`Cache`].
+    ///
+    /// To load a cache configuration from a file, use [`Cache::from_file`]. Otherwise, you can
+    /// create a new cache config using [`CacheConfig::new`] and passing that to [`Cache::new`].
+    ///
+    /// If you want to disable the cache, you can call this method with `None`.
+    ///
+    /// By default, new configs do not have caching enabled.
+    /// Every call to [`Module::new(my_wasm)`][crate::Module::new] will recompile `my_wasm`,
+    /// even when it is unchanged, unless an enabled `CacheConfig` is provided.
+    ///
+    /// This method is only available when the `cache` feature of this crate is
+    /// enabled.
+    ///
+    /// [docs]: https://bytecodealliance.github.io/wasmtime/cli-cache.html
+    ///
+    /// The file must be a valid Wasmtime cache TOML configuration. Passing `null`
+    /// disables cache for this `Config`.
+    public native Config cache(String path);
+
     /// Configures whether the debug verifier of Cranelift is enabled or not.
     ///
     /// When Cranelift is used as a code generation backend this will configure
@@ -274,203 +294,229 @@ public class Config implements Disposable{
     /// The default value for this is `false`
     public native Config craneliftNanCanonicalization(boolean enable);
 
-    /// Loads cache configuration specified at `path`.
-    ///
-    /// This method will read the file specified by `path` on the filesystem and
-    /// attempt to load cache configuration from it. This method can also fail
-    /// due to I/O errors, misconfiguration, syntax errors, etc. For expected
-    /// syntax in the configuration file see the [documentation online][docs].
-    ///
-    /// By default cache configuration is not enabled or loaded.
-    ///
-    /// # Errors
-    ///
-    /// This method can fail due to any error that happens when loading the file
-    /// pointed to by `path` and attempting to load the cache configuration.
-    ///
-    /// [docs]: https://bytecodealliance.github.io/wasmtime/cli-cache.html
-    private native Config cacheConfigLoadNative(String path);
-
-    public Config cacheConfigLoad(Path path){
-        return cacheConfigLoadNative(path.toString());
-    }
-
-    /// Loads cache configuration from the system default path.
-    ///
-    /// This commit is the same as [`Config::cacheConfigLoad`] except that it
-    /// does not take a path argument and instead loads the default
-    /// configuration present on the system. This is located, for example, on
-    /// Unix at `$HOME/.config/wasmtime/config.toml` and is typically created
-    /// with the `wasmtime config new` command.
-    ///
-    /// By default cache configuration is not enabled or loaded.
-    ///
-    /// # Errors
-    ///
-    /// This method can fail due to any error that happens when loading the
-    /// default system configuration. Note that it is not an error if the
-    /// default config file does not exist, in which case the default settings
-    /// for an enabled cache are applied.
-    ///
-    /// [docs]: https://bytecodealliance.github.io/wasmtime/cli-cache.html
-    public native Config cacheConfigLoadDefault();
-
     /// Sets a custom memory creator
 //    public native Config withHostMemory(MemoryCreator memCreator);
 
-    /// Configures the maximum size, in bytes, where a linear memory is
-    /// considered static, above which it'll be considered dynamic.
+    /// Specifies the capacity of linear memories, in bytes, in their initial
+    /// allocation.
     ///
-    /// This function configures the threshold for wasm memories whether they're
-    /// implemented as a dynamically relocatable chunk of memory or a statically
-    /// located chunk of memory. The `maxSize` parameter here is the size, in
-    /// bytes, where if the maximum size of a linear memory is below `maxSize`
-    /// then it will be statically allocated with enough space to never have to
-    /// move. If the maximum size of a linear memory is larger than `maxSize`
-    /// then wasm memory will be dynamically located and may move in memory
-    /// through growth operations.
+    /// > Note: this value has important performance ramifications, be sure to
+    /// > benchmark when setting this to a non-default value and read over this
+    /// > documentation.
     ///
-    /// Specifying a `maxSize` of 0 means that all memories will be dynamic and
-    /// may be relocated through `memory.grow`. Also note that if any wasm
-    /// memory's maximum size is below `maxSize` then it will still reserve
-    /// `maxSize` bytes in the virtual memory space.
+    /// This function will change the size of the initial memory allocation made
+    /// for linear memories. This setting is only applicable when the initial
+    /// size of a linear memory is below this threshold. Linear memories are
+    /// allocated in the virtual address space of the host process with OS APIs
+    /// such as `mmap` and this setting affects how large the allocation will
+    /// be.
     ///
-    /// ## Static vs Dynamic Memory
+    /// ## Background: WebAssembly Linear Memories
     ///
-    /// Linear memories represent contiguous arrays of bytes, but they can also
-    /// be grown through the API and wasm instructions. When memory is grown if
-    /// space hasn't been preallocated then growth may involve relocating the
-    /// base pointer in memory. Memories in Wasmtime are classified in two
-    /// different ways:
+    /// WebAssembly linear memories always start with a minimum size and can
+    /// possibly grow up to a maximum size. The minimum size is always specified
+    /// in a WebAssembly module itself and the maximum size can either be
+    /// optionally specified in the module or inherently limited by the index
+    /// type. For example for this module:
     ///
-    /// * **static** - these memories preallocate all space necessary they'll
-    ///   ever need, meaning that the base pointer of these memories is never
-    ///   moved. Static memories may take more virtual memory space because of
-    ///   pre-reserving space for memories.
+    /// ```wasm
+    /// (module
+    ///     (memory $a 4)
+    ///     (memory $b 4096 4096 (pagesize 1))
+    ///     (memory $c i64 10)
+    /// )
+    /// ```
     ///
-    /// * **dynamic** - these memories are not preallocated and may move during
-    ///   growth operations. Dynamic memories consume less virtual memory space
-    ///   because they don't need to preallocate space for future growth.
+    /// * Memory `$a` initially allocates 4 WebAssembly pages (256KiB) and can
+    ///   grow up to 4GiB, the limit of the 32-bit index space.
+    /// * Memory `$b` initially allocates 4096 WebAssembly pages, but in this
+    ///   case its page size is 1, so it's 4096 bytes. Memory can also grow no
+    ///   further meaning that it will always be 4096 bytes.
+    /// * Memory `$c` is a 64-bit linear memory which starts with 640KiB of
+    ///   memory and can theoretically grow up to 2^64 bytes, although most
+    ///   hosts will run out of memory long before that.
     ///
-    /// Static memories can be optimized better in JIT code because once the
-    /// base address is loaded in a function it's known that we never need to
-    /// reload it because it never changes, `memory.grow` is generally a pretty
-    /// fast operation because the wasm memory is never relocated, and under
-    /// some conditions bounds checks can be elided on memory accesses.
+    /// All operations on linear memories done by wasm are required to be
+    /// in-bounds. Any access beyond the end of a linear memory is considered a
+    /// trap.
     ///
-    /// Dynamic memories can't be quite as heavily optimized because the base
-    /// address may need to be reloaded more often, they may require relocating
-    /// lots of data on `memory.grow`, and dynamic memories require
-    /// unconditional bounds checks on all memory accesses.
+    /// ## What this setting affects: Virtual Memory
     ///
-    /// ## Should you use static or dynamic memory?
+    /// This setting is used to configure the behavior of the size of the linear
+    /// memory allocation performed for each of these memories. For example the
+    /// initial linear memory allocation looks like this:
     ///
-    /// In general you probably don't need to change the value of this property.
-    /// The defaults here are optimized for each target platform to consume a
-    /// reasonable amount of physical memory while also generating speedy
-    /// machine code.
+    /// ```text
+    ///              memory_reservation
+    ///                    |
+    ///          ◄─────────┴────────────────►
+    /// ┌───────┬─────────┬──────────────────┬───────┐
+    /// │ guard │ initial │ ... capacity ... │ guard │
+    /// └───────┴─────────┴──────────────────┴───────┘
+    ///  ◄──┬──►                              ◄──┬──►
+    ///     │                                    │
+    ///     │                             memory_guard_size
+    ///     │
+    ///     │
+    ///  memory_guard_size (if guard_before_linear_memory)
+    /// ```
     ///
-    /// One of the main reasons you may want to configure this today is if your
-    /// environment can't reserve virtual memory space for each wasm linear
-    /// memory. On 64-bit platforms wasm memories require a 6GB reservation by
-    /// default, and system limits may prevent this in some scenarios. In this
-    /// case you may wish to force memories to be allocated dynamically meaning
-    /// that the virtual memory footprint of creating a wasm memory should be
-    /// exactly what's used by the wasm itself.
+    /// Memory in the `initial` range is accessible to the instance and can be
+    /// read/written by wasm code. Memory in the `guard` regions is never
+    /// accessible to wasm code and memory in `capacity` is initially
+    /// inaccessible but may become accessible through `memory.grow` instructions
+    /// for example.
     ///
-    /// For 32-bit memories a static memory must contain at least 4GB of
-    /// reserved address space plus a guard page to elide any bounds checks at
-    /// all. Smaller static memories will use similar bounds checks as dynamic
-    /// memories.
+    /// This means that this setting is the size of the initial chunk of virtual
+    /// memory that a linear memory may grow into.
     ///
-    /// ## Default
+    /// ## What this setting affects: Runtime Speed
+    ///
+    /// This is a performance-sensitive setting which is taken into account
+    /// during the compilation process of a WebAssembly module. For example if a
+    /// 32-bit WebAssembly linear memory has a `memory_reservation` size of 4GiB
+    /// then bounds checks can be elided because `capacity` will be guaranteed
+    /// to be unmapped for all addressable bytes that wasm can access (modulo a
+    /// few details).
+    ///
+    /// If `memory_reservation` was something smaller like 256KiB then that
+    /// would have a much smaller impact on virtual memory but the compile code
+    /// would then need to have explicit bounds checks to ensure that
+    /// loads/stores are in-bounds.
+    ///
+    /// The goal of this setting is to enable skipping bounds checks in most
+    /// modules by default. Some situations which require explicit bounds checks
+    /// though are:
+    ///
+    /// * When `memory_reservation` is smaller than the addressable size of the
+    ///   linear memory. For example if 64-bit linear memories always need
+    ///   bounds checks as they can address the entire virtual address spacce.
+    ///   For 32-bit linear memories a `memory_reservation` minimum size of 4GiB
+    ///   is required to elide bounds checks.
+    ///
+    /// * When linear memories have a page size of 1 then bounds checks are
+    ///   required. In this situation virtual memory can't be relied upon
+    ///   because that operates at the host page size granularity where wasm
+    ///   requires a per-byte level granularity.
+    ///
+    /// * Configuration settings such as [`Config::signals_based_traps`] can be
+    ///   used to disable the use of signal handlers and virtual memory so
+    ///   explicit bounds checks are required.
+    ///
+    /// * When [`Config::memory_guard_size`] is too small a bounds check may be
+    ///   required. For 32-bit wasm addresses are actually 33-bit effective
+    ///   addresses because loads/stores have a 32-bit static offset to add to
+    ///   the dynamic 32-bit address. If the static offset is larger than the
+    ///   size of the guard region then an explicit bounds check is required.
+    ///
+    /// ## What this setting affects: Memory Growth Behavior
+    ///
+    /// In addition to affecting bounds checks emitted in compiled code this
+    /// setting also affects how WebAssembly linear memories are grown. The
+    /// `memory.grow` instruction can be used to make a linear memory larger and
+    /// this is also affected by APIs such as
+    /// [`Memory::grow`](crate::Memory::grow).
+    ///
+    /// In these situations when the amount being grown is small enough to fit
+    /// within the remaining capacity then the linear memory doesn't have to be
+    /// moved at runtime. If the capacity runs out though then a new linear
+    /// memory allocation must be made and the contents of linear memory is
+    /// copied over.
+    ///
+    /// For example here's a situation where a copy happens:
+    ///
+    /// * The `memory_reservation` setting is configured to 128KiB.
+    /// * A WebAssembly linear memory starts with a single 64KiB page.
+    /// * This memory can be grown by one page to contain the full 128KiB of
+    ///   memory.
+    /// * If grown by one more page, though, then a 192KiB allocation must be
+    ///   made and the previous 128KiB of contents are copied into the new
+    ///   allocation.
+    ///
+    /// This growth behavior can have a significant performance impact if lots
+    /// of data needs to be copied on growth. Conversely if memory growth never
+    /// needs to happen because the capacity will always be large enough then
+    /// optimizations can be applied to cache the base pointer of linear memory.
+    ///
+    /// When memory is grown then the
+    /// [`Config::memory_reservation_for_growth`] is used for the new
+    /// memory allocation to have memory to grow into.
+    ///
+    /// When using the pooling allocator via [`PoolingAllocationConfig`] then
+    /// memories are never allowed to move so requests for growth are instead
+    /// rejected with an error.
+    ///
+    /// ## When this setting is not used
+    ///
+    /// This setting is ignored and unused when the initial size of linear
+    /// memory is larger than this threshold. For example if this setting is set
+    /// to 1MiB but a wasm module requires a 2MiB minimum allocation then this
+    /// setting is ignored. In this situation the minimum size of memory will be
+    /// allocated along with [`Config::memory_reservation_for_growth`]
+    /// after it to grow into.
+    ///
+    /// That means that this value can be set to zero. That can be useful in
+    /// benchmarking to see the overhead of bounds checks for example.
+    /// Additionally it can be used to minimize the virtual memory allocated by
+    /// Wasmtime.
+    ///
+    /// ## Default Value
     ///
     /// The default value for this property depends on the host platform. For
     /// 64-bit platforms there's lots of address space available, so the default
-    /// configured here is 4GB. WebAssembly linear memories currently max out at
-    /// 4GB which means that on 64-bit platforms Wasmtime by default always uses
-    /// a static memory. This, coupled with a sufficiently sized guard region,
-    /// should produce the fastest JIT code on 64-bit platforms, but does
-    /// require a large address space reservation for each wasm memory.
+    /// configured here is 4GiB. When coupled with the default size of
+    /// [`Config::memory_guard_size`] this means that 32-bit WebAssembly linear
+    /// memories with 64KiB page sizes will skip almost all bounds checks by
+    /// default.
     ///
-    /// For 32-bit platforms this value defaults to 1GB. This means that wasm
-    /// memories whose maximum size is less than 1GB will be allocated
-    /// statically, otherwise they'll be considered dynamic.
-    public native Config staticMemoryMaximumSize(long maxSize);
+    /// For 32-bit platforms this value defaults to 10MiB. This means that
+    /// bounds checks will be required on 32-bit platforms.
+    public native Config memoryReservation(long maxSize);
 
     /// Configures the size, in bytes, of the guard region used at the end of a
-    /// static memory's address space reservation.
+    /// linear memory's address space reservation.
     ///
-    /// All WebAssembly loads/stores are bounds-checked and generate a trap if
-    /// they're out-of-bounds. Loads and stores are often very performance
-    /// critical, so we want the bounds check to be as fast as possible!
-    /// Accelerating these memory accesses is the motivation for a guard after a
-    /// memory allocation.
+    /// > Note: this value has important performance ramifications, be sure to
+    /// > understand what this value does before tweaking it and benchmarking.
     ///
-    /// Memories (both static and dynamic) can be configured with a guard at the
-    /// end of them which consists of unmapped virtual memory. This unmapped
-    /// memory will trigger a memory access violation (e.g. segfault) if
-    /// accessed. This allows JIT code to elide bounds checks if it can prove
-    /// that an access, if out of bounds, would hit the guard region. This means
-    /// that having such a guard of unmapped memory can remove the need for
-    /// bounds checks in JIT code.
+    /// This setting controls how many bytes are guaranteed to be unmapped after
+    /// the virtual memory allocation of a linear memory. When
+    /// combined with sufficiently large values of
+    /// [`Config::memory_reservation`] (e.g. 4GiB for 32-bit linear memories)
+    /// then a guard region can be used to eliminate bounds checks in generated
+    /// code.
     ///
-    /// For the difference between static and dynamic memories, see the
-    /// [`Config::staticMemoryMaximumSize`].
+    /// This setting additionally can be used to help deduplicate bounds checks
+    /// in code that otherwise requires bounds checks. For example with a 4KiB
+    /// guard region then a 64-bit linear memory which accesses addresses `x+8`
+    /// and `x+16` only needs to perform a single bounds check on `x`. If that
+    /// bounds check passes then the offset is guaranteed to either reside in
+    /// linear memory or the guard region, resulting in deterministic behavior
+    /// either way.
     ///
     /// ## How big should the guard be?
     ///
-    /// In general, like with configuring `staticMemoryMaximumSize`, you
-    /// probably don't want to change this value from the defaults. Otherwise,
-    /// though, the size of the guard region affects the number of bounds checks
-    /// needed for generated wasm code. More specifically, loads/stores with
-    /// immediate offsets will generate bounds checks based on how big the guard
-    /// page is.
+    /// In general, like with configuring [`Config::memory_reservation`], you
+    /// probably don't want to change this value from the defaults. Removing
+    /// bounds checks is dependent on a number of factors where the size of the
+    /// guard region is only one piece of the equation. Other factors include:
     ///
-    /// For 32-bit memories a 4GB static memory is required to even start
-    /// removing bounds checks. A 4GB guard size will guarantee that the module
-    /// has zero bounds checks for memory accesses. A 2GB guard size will
-    /// eliminate all bounds checks with an immediate offset less than 2GB. A
-    /// guard size of zero means that all memory accesses will still have bounds
-    /// checks.
+    /// * [`Config::memory_reservation`]
+    /// * The index type of the linear memory (e.g. 32-bit or 64-bit)
+    /// * The page size of the linear memory
+    /// * Other settings such as [`Config::signals_based_traps`]
+    ///
+    /// Embeddings using virtual memory almost always want at least some guard
+    /// region, but otherwise changes from the default should be profiled
+    /// locally to see the performance impact.
     ///
     /// ## Default
     ///
-    /// The default value for this property is 2GB on 64-bit platforms. This
+    /// The default value for this property is 32MiB on 64-bit platforms. This
     /// allows eliminating almost all bounds checks on loads/stores with an
-    /// immediate offset of less than 2GB. On 32-bit platforms this defaults to
-    /// 64KB.
-    ///
-    /// ## Static vs Dynamic Guard Size
-    ///
-    /// Note that for now the static memory guard size must be at least as large
-    /// as the dynamic memory guard size, so configuring this property to be
-    /// smaller than the dynamic memory guard size will have no effect.
-    public native Config staticMemoryGuardSize(long guardSize);
-
-    /// Configures the size, in bytes, of the guard region used at the end of a
-    /// dynamic memory's address space reservation.
-    ///
-    /// For the difference between static and dynamic memories, see the
-    /// [`Config::staticMemoryMaximumSize`]
-    ///
-    /// For more information about what a guard is, see the documentation on
-    /// [`Config::staticMemoryGuardSize`].
-    ///
-    /// Note that the size of the guard region for dynamic memories is not super
-    /// critical for performance. Making it reasonably-sized can improve
-    /// generated code slightly, but for maximum performance you'll want to lean
-    /// towards static memories rather than dynamic anyway.
-    ///
-    /// Also note that the dynamic memory guard size must be smaller than the
-    /// static memory guard size, so if a large dynamic memory guard is
-    /// specified then the static memory guard size will also be automatically
-    /// increased.
-    ///
-    /// ## Default
-    ///
-    /// This value defaults to 64KB.
-    public native Config dynamicMemoryGuardSize(long guardSize);
+    /// immediate offset of less than 32MiB. On 32-bit platforms this defaults
+    /// to 64KiB.
+    public native Config memoryGuardSize(long guardSize);
 
     private static native long newConfig();
 

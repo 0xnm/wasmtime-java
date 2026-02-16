@@ -1,9 +1,9 @@
 #[link(wasm_import_module = "xyz")]
-extern "C" {
+unsafe extern "C" {
     fn poll_word(addr: i64, len: i32) -> i32;
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub unsafe extern "C" fn do_work() {
     let mut buf = [0u8; 1024];
     let buf_ptr = buf.as_mut_ptr() as i64;
